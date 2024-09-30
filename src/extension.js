@@ -1,34 +1,32 @@
 const vscode = require('vscode');
 const axios = require('axios');
-require('dotenv').config()
 
 /**
  * Function to get LLM suggestions from an API based on user input
  */
-async function getSuggestions(codeSnippet, apiKey, provider) {
+async function getSuggestions(codeSnippet, apiKey, provider, maxTokens, temperature) {
   let apiUrl, requestBody;
 
-  // Adjust request body depending on the provider
+  // Adjust request body and API URL depending on the provider selected
   if (provider === 'Hugging Face') {
     apiUrl = 'https://api-inference.huggingface.co/models/bigcode/starcoder';
     requestBody = {
       inputs: `# Instruction: Provide a concise, well-optimized solution for the following code or task.\n\n${codeSnippet}`,
- // Improve the prompt
-      parameters: { max_new_tokens: 200 }  // Increase max tokens for better results
+      parameters: { max_new_tokens: maxTokens }  // Set max tokens from user config
     };
-  } else if (provider === 'AWS') {
+  } else if (provider === 'AWS Llama') {
     apiUrl = 'https://api.aws.com/llama/generate';
     requestBody = {
       prompt: codeSnippet,
-      max_tokens: 200  // Increase max tokens for better results
+      max_tokens: maxTokens  // Use user-configured max tokens
     };
-  } else {
+  } else if (provider === 'OpenAI GPT-4') {
     apiUrl = 'https://api.openai.com/v1/completions';
     requestBody = {
-      prompt: `Optimize and refactor the following code:\n\n${codeSnippet}`,  // Improve the prompt
-      max_tokens: 200,  // Adjust max tokens
-      temperature: 0.3,  // Control response randomness
-      model: 'gpt-4'  // Switch to GPT-4 for better results
+      prompt: `Optimize and refactor the following code:\n\n${codeSnippet}`,
+      max_tokens: maxTokens,  // Set max tokens from user config
+      temperature: temperature,  // Use temperature from user config
+      model: 'gpt-4'
     };
   }
 
@@ -48,20 +46,23 @@ async function getSuggestions(codeSnippet, apiKey, provider) {
         return 'No suggestion found from Hugging Face.';
       }
     } else {
-      return response.data.choices[0].text;  // OpenAI response structure
+      return response.data.choices[0].text;  // OpenAI and AWS response structure
     }
   } catch (error) {
-    vscode.window.showErrorMessage('Error fetching Code suggestion: ' + (error.response ? error.response.data.error : error.message));
+    vscode.window.showErrorMessage('Error fetching code suggestion: ' + (error.response ? error.response.data.error : error.message));
     return '';
   }
 }
 
 /**
- * This function activates the extension
+ * This function activates the extension.
+ * Registers the command and provides the LLM suggestion to the editor.
  */
 function activate(context) {
- // Set your API key here
-  const apiKey = "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"
+  // Use VSCode Secret Storage for secure API key storage
+  const secretStorage = context.secrets;
+
+  // Register the main command for providing LLM-based code suggestions
   let disposable = vscode.commands.registerCommand('codegini.suggestCode', async function () {
     const editor = vscode.window.activeTextEditor;
     if (!editor) {
@@ -77,14 +78,33 @@ function activate(context) {
       return;
     }
 
-    const provider = await vscode.window.showQuickPick([ 'Hugging Face'], { placeHolder: 'Select LLM Provider' });
+    // Prompt user to select LLM provider
+    const provider = await vscode.window.showQuickPick(['Hugging Face', 'AWS Llama', 'OpenAI GPT-4'], { placeHolder: 'Select LLM Provider' });
     if (!provider) {
       vscode.window.showErrorMessage('No provider selected.');
       return;
     }
 
-    const suggestion = await getSuggestions(codeSnippet, apiKey, provider);
+    // Retrieve user-configured API key or prompt for it
+    let apiKey = await secretStorage.get(provider);
+    if (!apiKey) {
+      apiKey = await vscode.window.showInputBox({ prompt: `Enter your API key for ${provider}` });
+      if (!apiKey) {
+        vscode.window.showErrorMessage('No API key provided.');
+        return;
+      }
+      await secretStorage.store(provider, apiKey);  // Store API key securely
+    }
 
+    // Fetch user configuration settings for maxTokens and temperature
+    const config = vscode.workspace.getConfiguration('llmPlugin');
+    const maxTokens = config.get('maxTokens') || 200;
+    const temperature = config.get('temperature') || 0.3;
+
+    // Get code suggestion from the selected provider
+    const suggestion = await getSuggestions(codeSnippet, apiKey, provider, maxTokens, temperature);
+
+    // Insert the suggestion into the code editor
     if (suggestion) {
       editor.edit(editBuilder => {
         editBuilder.replace(selection, suggestion);
@@ -98,8 +118,12 @@ function activate(context) {
   context.subscriptions.push(disposable);
 }
 
+/**
+ * This function is called when the extension is deactivated
+ */
 function deactivate() {}
 
+// Export the activate and deactivate functions
 module.exports = {
   activate,
   deactivate

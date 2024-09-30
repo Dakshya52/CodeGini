@@ -43,5 +43,22 @@
   "dependencies": {
     "axios": "^1.7.7",
     "dotenv": "^16.4.5"
+  },
+    "contributes": {
+    "configuration": {
+      "type": "object",
+      "properties": {
+        "llmPlugin.maxTokens": {
+          "type": "integer",
+          "default": 200,
+          "description": "Maximum number of tokens to request from the LLM."
+        },
+        "llmPlugin.temperature": {
+          "type": "number",
+          "default": 0.3,
+          "description": "Temperature setting for the LLM (controls response randomness)."
+        }
+      }
+    }
   }
 }
