@@ -6,6 +6,8 @@
 
 This VSCode plugin integrates with multiple large language models (LLMs) such as Hugging Face, AWS Llama, and OpenAI GPT-4 to provide advanced code suggestions, refactoring, and completion features directly in your IDE.
 
+![Workflow](Assets/CodeGini-workflow.png)
+
 ## Features
 
 - **Multiple LLM Provider Support**: Supports Hugging Face (StarCoder), AWS (Llama), and OpenAI (GPT-4).
