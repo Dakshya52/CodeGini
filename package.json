@@ -1,0 +1,46 @@
+{
+  "name": "codegini-coding-assistance",
+  "displayName": "CodeGini Coding Assistant",
+  "description": "A plugin that integrates with large language models (LLMs) for coding assistance.",
+  "version": "0.0.1",
+  "publisher": "daksh&dhruv",
+  "engines": {
+    "vscode": "^1.93.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:codegini.suggestCode"
+  ],
+  "main": "./src/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "codegini.suggestCode",
+        "title": "Get Code Suggestion by CodeGini"
+      }
+    ],
+    "configuration": {
+      "title": "CodeGini",
+      "properties": {
+        "codegini.provider": {
+          "type": "string",
+          "description": "Choose your LLM provider",
+          "enum": [
+            "Hugging Face"
+          ],
+          "default": "Hugging Face",
+          "scope": "global"
+        }
+      }
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^14.14.41",
+    "@types/vscode": "^1.50.0"
+  },
+  "dependencies": {
+    "axios": "^1.7.7"
+  }
+}
