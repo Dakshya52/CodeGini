@@ -1,5 +1,6 @@
 const vscode = require('vscode');
 const axios = require('axios');
+require('dotenv').config()
 
 /**
  * Function to get LLM suggestions from an API based on user input
@@ -13,7 +14,7 @@ async function getSuggestions(codeSnippet, apiKey, provider) {
     requestBody = {
       inputs: `# Instruction: Provide a concise, well-optimized solution for the following code or task.\n\n${codeSnippet}`,
  // Improve the prompt
-      parameters: { max_new_tokens: 2000 }  // Increase max tokens for better results
+      parameters: { max_new_tokens: 200 }  // Increase max tokens for better results
     };
   } else if (provider === 'AWS') {
     apiUrl = 'https://api.aws.com/llama/generate';
@@ -60,7 +61,7 @@ async function getSuggestions(codeSnippet, apiKey, provider) {
  */
 function activate(context) {
  // Set your API key here
-  const apiKey = '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'
+  const apiKey = "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"
   let disposable = vscode.commands.registerCommand('codegini.suggestCode', async function () {
     const editor = vscode.window.activeTextEditor;
     if (!editor) {

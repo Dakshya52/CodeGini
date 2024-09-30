@@ -41,6 +41,7 @@
     "@types/vscode": "^1.50.0"
   },
   "dependencies": {
-    "axios": "^1.7.7"
+    "axios": "^1.7.7",
+    "dotenv": "^16.4.5"
   }
 }
