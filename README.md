@@ -1,5 +1,5 @@
 <p align="center">
-  <strong><h1 style="font-size: 50px;" align="center">CodeGini</h1></strong>
+  <strong><h1 style="font-size: 60px;" align="center">CodeGini</h1></strong>
 </p>
 
 # LLM Code Suggestion Plugin for VSCode
@@ -36,7 +36,7 @@ This VSCode plugin integrates with multiple large language models (LLMs) such as
 ### Steps
 1. Clone or download this repository.
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/Dakshya52/CodeGini
    ```
 2. Open the project folder in **Visual Studio Code**.
 
