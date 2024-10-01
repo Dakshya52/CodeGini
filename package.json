@@ -3,7 +3,7 @@
   "displayName": "CodeGini Coding Assistant",
   "description": "A plugin that integrates with large language models (LLMs) for coding assistance.",
   "version": "0.0.1",
-  "publisher": "daksh&dhruv",
+  "publisher": "daksh_dhruv",
   "engines": {
     "vscode": "^1.93.0"
   },

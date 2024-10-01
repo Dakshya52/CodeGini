@@ -98,7 +98,7 @@ function activate(context) {
 
     // Fetch user configuration settings for maxTokens and temperature
     const config = vscode.workspace.getConfiguration('llmPlugin');
-    const maxTokens = config.get('maxTokens') || 200;
+    const maxTokens = config.get('maxTokens') || 3000;
     const temperature = config.get('temperature') || 0.3;
 
     // Get code suggestion from the selected provider
