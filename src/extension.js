@@ -115,7 +115,28 @@ function activate(context) {
     }
   });
 
-  context.subscriptions.push(disposable);
+  // Command to delete API key for a specific provider
+  let deleteApiKey = vscode.commands.registerCommand('codegini.deleteApiKey', async function () {
+    // Prompt user to select the LLM provider for which to delete the API key
+    const provider = await vscode.window.showQuickPick(['Hugging Face', 'AWS Llama', 'OpenAI GPT-4'], { placeHolder: 'Select LLM Provider to delete API key' });
+    if (!provider) {
+      vscode.window.showErrorMessage('No provider selected.');
+      return;
+    }
+
+    // Confirm if the user really wants to delete the key
+    const confirm = await vscode.window.showQuickPick(['Yes', 'No'], { placeHolder: `Are you sure you want to delete the API key for ${provider}?` });
+    if (confirm !== 'Yes') {
+      vscode.window.showInformationMessage('API key deletion cancelled.');
+      return;
+    }
+
+    // Delete the API key from Secret Storage
+    await secretStorage.delete(provider);
+    vscode.window.showInformationMessage(`API key for ${provider} has been deleted.`);
+  });
+
+  context.subscriptions.push(disposable, deleteApiKey);
 }
 
 /**
