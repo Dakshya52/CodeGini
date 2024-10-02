@@ -11,21 +11,33 @@ async function getSuggestions(codeSnippet, apiKey, provider, maxTokens, temperat
   if (provider === 'Hugging Face') {
     apiUrl = 'https://api-inference.huggingface.co/models/bigcode/starcoder';
     requestBody = {
-      inputs: `# Instruction: Provide a concise, well-optimized solution for the following code or task.\n\n${codeSnippet}`,
-      parameters: { max_new_tokens: maxTokens }  // Set max tokens from user config
+      inputs: `${codeSnippet}`,
+      // inputs: `# Instruction: Write a Python program that takes input from the user, collects a lis of numbers, and sorts them in ascending order. Please include appropriate input handling and comments to explain the code.\n\n${codeSnippet}`,
+      parameters: {
+        // temperature: 0.3,
+        max_new_tokens: 5120,
+        // top_k: 30,
+        // top_p: 0.85,
+        // repetition_penalty: 1.5,
+        // do_sample: true,
+        // return_full_text: false
+      },
+      // options: {
+      //   use_cache: false
+      // }
     };
   } else if (provider === 'AWS Llama') {
     apiUrl = 'https://api.aws.com/llama/generate';
     requestBody = {
       prompt: codeSnippet,
-      max_tokens: maxTokens  // Use user-configured max tokens
+      max_tokens: maxTokens
     };
   } else if (provider === 'OpenAI GPT-4') {
     apiUrl = 'https://api.openai.com/v1/completions';
     requestBody = {
       prompt: `Optimize and refactor the following code:\n\n${codeSnippet}`,
-      max_tokens: maxTokens,  // Set max tokens from user config
-      temperature: temperature,  // Use temperature from user config
+      max_tokens: maxTokens,
+      temperature: temperature,
       model: 'gpt-4'
     };
   }
@@ -53,7 +65,6 @@ async function getSuggestions(codeSnippet, apiKey, provider, maxTokens, temperat
     return '';
   }
 }
-
 /**
  * This function activates the extension.
  * Registers the command and provides the LLM suggestion to the editor.
@@ -99,7 +110,7 @@ function activate(context) {
     // Fetch user configuration settings for maxTokens and temperature
     const config = vscode.workspace.getConfiguration('llmPlugin');
     const maxTokens = config.get('maxTokens') || 3000;
-    const temperature = config.get('temperature') || 0.3;
+    const temperature = config.get('temperature') || 0.7;
 
     // Get code suggestion from the selected provider
     const suggestion = await getSuggestions(codeSnippet, apiKey, provider, maxTokens, temperature);
