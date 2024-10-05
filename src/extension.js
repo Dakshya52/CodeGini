@@ -5,66 +5,64 @@ const axios = require('axios');
  * Function to get LLM suggestions from an API based on user input
  */
 async function getSuggestions(codeSnippet, apiKey, provider, maxTokens, temperature) {
-  let apiUrl, requestBody;
-
-  // Adjust request body and API URL depending on the provider selected
-  if (provider === 'Hugging Face') {
-    apiUrl = 'https://api-inference.huggingface.co/models/bigcode/starcoder';
-    requestBody = {
-      inputs: `${codeSnippet}`,
-      // inputs: `# Instruction: Write a Python program that takes input from the user, collects a lis of numbers, and sorts them in ascending order. Please include appropriate input handling and comments to explain the code.\n\n${codeSnippet}`,
-      parameters: {
-        // temperature: 0.3,
-        max_new_tokens: 5120,
-        // top_k: 30,
-        // top_p: 0.85,
-        // repetition_penalty: 1.5,
-        // do_sample: true,
-        // return_full_text: false
-      },
-      // options: {
-      //   use_cache: false
-      // }
-    };
-  } else if (provider === 'AWS Llama') {
-    apiUrl = 'https://api.aws.com/llama/generate';
-    requestBody = {
-      prompt: codeSnippet,
-      max_tokens: maxTokens
-    };
-  } else if (provider === 'OpenAI GPT-4') {
-    apiUrl = 'https://api.openai.com/v1/completions';
-    requestBody = {
-      prompt: `Optimize and refactor the following code:\n\n${codeSnippet}`,
-      max_tokens: maxTokens,
-      temperature: temperature,
-      model: 'gpt-4'
-    };
-  }
-
-  try {
-    const response = await axios.post(apiUrl, requestBody, {
-      headers: { 'Authorization': `Bearer ${apiKey}` }
-    });
-
-    // Log the entire response to understand its structure
-    console.log('Full API Response:', JSON.stringify(response.data, null, 2));
-
-    // Adjust response extraction depending on the provider
+    let apiUrl, requestBody;
+  
+    // Adjust request body and API URL depending on the provider selected
     if (provider === 'Hugging Face') {
-      if (response.data && response.data.length > 0 && response.data[0].generated_text) {
-        return response.data[0].generated_text.split('/*')[0]; 
-      } else {
-        return 'No suggestion found from Hugging Face.';
-      }
-    } else {
-      return response.data.choices[0].text;  // OpenAI and AWS response structure
+      apiUrl = 'https://api-inference.huggingface.co/models/bigcode/starcoder';
+      requestBody = {
+        inputs: `${codeSnippet}`,
+        parameters: {
+          max_new_tokens: 5120,
+        },
+      };
+    } else if (provider === 'Cohere') {
+      apiUrl = 'https://api.cohere.ai/v1/generate';
+      requestBody = {
+        model: 'command-r-08-2024',
+        prompt: `Only provide the code for the following task : ${codeSnippet}`,
+        max_tokens: maxTokens,
+        temperature: temperature,
+      };
+    } else if (provider === 'OpenAI GPT-4') {
+      apiUrl = 'https://api.openai.com/v1/completions';
+      requestBody = {
+        prompt: `Optimize and refactor the following code:\n\n${codeSnippet}`,
+        max_tokens: maxTokens,
+        temperature: temperature,
+        model: 'gpt-4',
+      };
     }
-  } catch (error) {
-    vscode.window.showErrorMessage('Error fetching code suggestion: ' + (error.response ? error.response.data.error : error.message));
-    return '';
-  }
-}
+  
+    try {
+      const response = await axios.post(apiUrl, requestBody, {
+        headers: { Authorization: `Bearer ${apiKey}` },
+      });
+  
+      // Log the entire response to understand its structure
+      console.log('Full API Response:', JSON.stringify(response.data, null, 2));
+  
+      // Adjust response extraction depending on the provider
+      if (provider === 'Hugging Face') {
+        if (response.data && response.data.length > 0 && response.data[0].generated_text) {
+          return response.data[0].generated_text.split('/*')[0];
+        } else {
+          return 'No suggestion found from Hugging Face.';
+        }
+      } else if (provider === 'Cohere') {
+        if (response.data.generations && response.data.generations.length > 0) {
+          return response.data.generations[0].text;
+        } else {
+          return 'No suggestion found from Cohere.';
+        }
+      } else {
+        return response.data.choices[0].text; // OpenAI response structure
+      }
+    } catch (error) {
+      vscode.window.showErrorMessage('Error fetching code suggestion: ' + (error.response ? error.response.data.error : error.message));
+      return '';
+    }
+  }  
 /**
  * This function activates the extension.
  * Registers the command and provides the LLM suggestion to the editor.
@@ -90,7 +88,7 @@ function activate(context) {
     }
 
     // Prompt user to select LLM provider
-    const provider = await vscode.window.showQuickPick(['Hugging Face', 'AWS Llama', 'OpenAI GPT-4'], { placeHolder: 'Select LLM Provider' });
+    const provider = await vscode.window.showQuickPick(['Hugging Face', 'Cohere', 'OpenAI GPT-4'], { placeHolder: 'Select LLM Provider' });
     if (!provider) {
       vscode.window.showErrorMessage('No provider selected.');
       return;
@@ -129,8 +127,8 @@ function activate(context) {
   // Command to delete API key for a specific provider
   let deleteApiKey = vscode.commands.registerCommand('codegini.deleteApiKey', async function () {
     // Prompt user to select the LLM provider for which to delete the API key
-    const provider = await vscode.window.showQuickPick(['Hugging Face', 'AWS Llama', 'OpenAI GPT-4'], { placeHolder: 'Select LLM Provider to delete API key' });
-    if (!provider) {
+    const provider = await vscode.window.showQuickPick(['Hugging Face', 'Cohere', 'OpenAI GPT-4'], { placeHolder: 'Select LLM Provider to delete API key' });
+    if (!provider) { 
       vscode.window.showErrorMessage('No provider selected.');
       return;
     }
