@@ -20,7 +20,16 @@ async function getSuggestions(codeSnippet, apiKey, provider, maxTokens, temperat
         apiUrl = 'https://api.cohere.ai/v1/generate';
         requestBody = {
             model: 'command-r-08-2024',
-            prompt: `Only provide the code for the following task : ${codeSnippet}`,
+            prompt: `Everything other than the code in the response should be a comment, as the response is coming in an editor. 
+            If the task involves explanations, documentation, or clarification, provide them as comments within the code.
+             Ensure that if asked for documentation, inline documentation with comments is generated. When generating test cases,
+              do not remove the original code. Other than that, whatever is asked in the codeSnippet (which will also contain a prompt) 
+              should be done accordingly. 
+              If asked for tiggering of a gitlab pipeline give const response = await axios.post(
+            $GITLAB_API_URLprojects/{PROJECT_ID/trigger/pipeline,
+            { ref: 'master' , token: GITLAB_TOKEN } 
+        ) Task: ${codeSnippet}`,
+
             max_tokens:1000,
             temperature: 0.5,
             k: 5,                         
@@ -31,7 +40,13 @@ async function getSuggestions(codeSnippet, apiKey, provider, maxTokens, temperat
     } else if (provider === 'OpenAI GPT-4') {
         apiUrl = 'https://api.openai.com/v1/completions';
         requestBody = {
-            prompt: `Optimize and refactor the following code:\n\n${codeSnippet}`,
+            prompt: `Everything other than the code in the response should be a comment, as the response is coming in an editor. 
+            If the task involves explanations, documentation, or clarification, provide them as comments within the code.
+             Ensure that if asked for documentation, inline documentation with comments is generated. When generating test cases,
+              do not remove the original code. Other than that, whatever is asked in the codeSnippet (which will also contain a prompt) 
+              should be done accordingly. 
+              If asked for triggering of a gitlab pipeline give a post request with token and ref to the gitlab
+              Task: ${codeSnippet}`,
             max_tokens: maxTokens,
             temperature: temperature,
             model: 'gpt-4',
