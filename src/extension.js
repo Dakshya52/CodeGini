@@ -21,8 +21,12 @@ async function getSuggestions(codeSnippet, apiKey, provider, maxTokens, temperat
         requestBody = {
             model: 'command-r-08-2024',
             prompt: `Only provide the code for the following task : ${codeSnippet}`,
-            max_tokens: maxTokens,
-            temperature: temperature,
+            max_tokens:1000,
+            temperature: 0.5,
+            k: 5,                         
+            p: 0.7,
+            citation_quality: 'low',      // Reduce citation quality for speed
+            search_queries_only: false,
         };
     } else if (provider === 'OpenAI GPT-4') {
         apiUrl = 'https://api.openai.com/v1/completions';
