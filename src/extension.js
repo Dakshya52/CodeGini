@@ -30,7 +30,7 @@ async function getSuggestions(codeSnippet, apiKey, provider, maxTokens, temperat
             { ref: 'master' , token: GITLAB_TOKEN } 
         ) Task: ${codeSnippet}`,
 
-            max_tokens:1000,
+            max_tokens:4000,
             temperature: 0.5,
             k: 5,                         
             p: 0.7,
