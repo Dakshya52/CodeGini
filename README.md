@@ -73,6 +73,7 @@ This VSCode plugin integrates with multiple large language models (LLMs) such as
    - Hugging Face (StarCoder)
    - AWS Llama
    - OpenAI GPT-4
+   - Cohere
 2. Select the provider of your choice.
 
 ### Step 4: Provide API Key
