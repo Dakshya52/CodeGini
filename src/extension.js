@@ -4,7 +4,7 @@ const axios = require('axios');
 /**
  * Function to get LLM suggestions from an API based on user input
  */
-async function getSuggestions(codeSnippet, apiKey, provider, maxTokens, temperature) {
+async function getSuggestions(codeSnippet, apiKey, provider, maxTokens, temperature, task = '') {
     let apiUrl, requestBody;
 
     // Adjust request body and API URL depending on the provider selected
@@ -20,50 +20,19 @@ async function getSuggestions(codeSnippet, apiKey, provider, maxTokens, temperat
         apiUrl = 'https://api.cohere.ai/v1/generate';
         requestBody = {
             model: 'command-r-08-2024',
-            prompt: `Everything other than the code in the response should be a comment, as the response is coming in an editor. 
-            If the task involves explanations, documentation, or clarification, provide them as comments within the code.
-             Ensure that if asked for documentation, inline documentation with comments is generated. When generating test cases,
-              do not remove the original code. Other than that, whatever is asked in the codeSnippet (which will also contain a prompt) 
-              should be done accordingly. 
-              If asked for tiggering of a gitlab pipeline give const response = await axios.post(
-            $GITLAB_API_URLprojects/{PROJECT_ID/trigger/pipeline,
-            { ref: 'master' , token: GITLAB_TOKEN } 
-        ) Task: ${codeSnippet}`,
-
-            max_tokens:4000,
+            prompt: `If the user ask to generate diagram just generate the diagram in mermaid format(Ensure the diagram is valid and starts with a supported Mermaid keyword like graph TD) else just perform the task as per the user request. \n\nTask: ${codeSnippet}`,
+            max_tokens: 1500,
             temperature: 0.5,
-            k: 5,                         
+            k: 5,
             p: 0.7,
-            citation_quality: 'low',      // Reduce citation quality for speed
-            search_queries_only: false,
         };
     } else if (provider === 'OpenAI GPT-4') {
         apiUrl = 'https://api.openai.com/v1/completions';
         requestBody = {
-            prompt: `Everything other than the code in the response should be a comment, as the response is coming in an editor. 
-            If the task involves explanations, documentation, or clarification, provide them as comments within the code.
-             Ensure that if asked for documentation, inline documentation with comments is generated. When generating test cases,
-              do not remove the original code. Other than that, whatever is asked in the codeSnippet (which will also contain a prompt) 
-              should be done accordingly. 
-              If asked for triggering of a gitlab pipeline give a post request with token and ref to the gitlab
-              Task: ${codeSnippet}`,
+            prompt: `Task: ${codeSnippet}`,
             max_tokens: maxTokens,
             temperature: temperature,
             model: 'gpt-4',
-        };
-    } else if (provider === 'AWS Llama') {
-        apiUrl = 'https://api.aws.com/v1/generate'; // Ensure this URL is correct for AWS Llama
-        requestBody = {
-            prompt: `${codeSnippet}`,
-            max_tokens: maxTokens,
-            temperature: temperature,
-        };
-    } else if (provider === 'Azure AI') {
-        apiUrl = 'https://deepsolv.openai.azure.com'; // Replace with your actual Azure AI endpoint
-        requestBody = {
-            prompt: `Only provide the code for the following task : ${codeSnippet}`,
-            max_tokens: maxTokens,
-            temperature: temperature,
         };
     }
 
@@ -72,30 +41,14 @@ async function getSuggestions(codeSnippet, apiKey, provider, maxTokens, temperat
             headers: { Authorization: `Bearer ${apiKey}` },
         });
 
-        // Log the entire response to understand its structure
         console.log('Full API Response:', JSON.stringify(response.data, null, 2));
 
-        // Adjust response extraction depending on the provider
         if (provider === 'Hugging Face') {
-            if (response.data && response.data.length > 0 && response.data[0].generated_text) {
-                return response.data[0].generated_text.split('/*')[0];
-            } else {
-                return 'No suggestion found from Hugging Face.';
-            }
+            return response.data[0]?.generated_text || 'No suggestion found from Hugging Face.';
         } else if (provider === 'Cohere') {
-            if (response.data.generations && response.data.generations.length > 0) {
-                return response.data.generations[0].text;
-            } else {
-                return 'No suggestion found from Cohere.';
-            }
+            return response.data.generations[0]?.text || 'No suggestion found from Cohere.';
         } else if (provider === 'OpenAI GPT-4') {
-            return response.data.choices[0].text; // OpenAI response structure
-        } else if (provider === 'AWS Llama') {
-            // Adjust for AWS Llama response structure if needed
-            return response.data.output; // Ensure you extract the text correctly from the response
-        } else if (provider === 'Azure AI') {
-            // Adjust for Azure AI response structure if needed
-            return response.data.choices[0].text; // Ensure this matches Azure AI's response structure
+            return response.data.choices[0]?.text || 'No suggestion found from OpenAI.';
         }
     } catch (error) {
         vscode.window.showErrorMessage('Error fetching code suggestion: ' + (error.response ? error.response.data.error : error.message));
@@ -104,14 +57,177 @@ async function getSuggestions(codeSnippet, apiKey, provider, maxTokens, temperat
 }
 
 /**
+ * Function to generate a Mermaid diagram and display it in a webview
+ */
+/**
+ * Utility function to validate Mermaid code.
+ */
+function validateMermaidCode(mermaidCode) {
+    // Simple validation for empty or invalid code
+    if (!mermaidCode || !mermaidCode.trim()) {
+        vscode.window.showErrorMessage('Generated Mermaid diagram is empty or invalid.');
+        return false;
+    }
+
+    // Check for basic Mermaid diagram structure
+    if (!mermaidCode.startsWith('graph ') && !mermaidCode.startsWith('sequenceDiagram') && !mermaidCode.startsWith('classDiagram')) {
+        vscode.window.showErrorMessage('Generated Mermaid code does not match a known Mermaid diagram type.');
+        return false;
+    }
+
+    return true;
+}
+
+/**
+ * Clean up Mermaid code to avoid syntax errors.
+ */
+function cleanMermaidCode(mermaidCode) {
+    return mermaidCode
+        .replace(/^\s*\/\/.*$/gm, '') // Remove single-line comments
+        .replace(/\r/g, '')          // Normalize line endings
+        .trim();                     // Remove extra whitespace
+}
+
+async function generateMermaidDiagram(mermaidCode) {
+
+    const panel = vscode.window.createWebviewPanel(
+        'mermaidPreview',
+        'Mermaid Diagram Preview',
+        vscode.ViewColumn.One,
+        { enableScripts: true }
+    );
+
+    panel.webview.html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+            <script>
+            try {
+            mermaid.initialize({ startOnLoad: true });
+            } catch (error) {
+        document.body.innerHTML = <pre style="color: red;">Mermaid syntax error: error.message</pre>;
+    }
+            </script>
+
+        </head>
+        <body>
+            <div class="mermaid">
+                ${mermaidCode}
+            </div>
+        </body>
+        </html>
+    `;
+}
+
+
+
+/**
+ * Utility function to extract Mermaid code from an LLM response
+ */
+function extractMermaidCode(llmResponse) {
+    const match = llmResponse.match(/```mermaid([\s\S]*?)```/);
+    return match ? match[1].trim() : null;
+}
+
+// async function handleVoiceCommands(context) {
+//     const panel = vscode.window.createWebviewPanel(
+//         'voiceCommand',
+//         'Voice Command Input',
+//         vscode.ViewColumn.One,
+//         { enableScripts: true }
+//     );
+
+//     panel.webview.html = `
+//         <!DOCTYPE html>
+//         <html>
+//         <head>
+//             <style>
+//                 body { font-family: Arial, sans-serif; text-align: center; margin: 50px; }
+//                 button { padding: 10px 20px; font-size: 16px; cursor: pointer; }
+//                 #output { margin-top: 20px; font-size: 18px; }
+//             </style>
+//         </head>
+//         <body>
+//             <h1>Voice Command</h1>
+//             <button id="startButton">Start Listening</button>
+//             <div id="output">Waiting for your command...</div>
+//             <script>
+//                 const vscode = acquireVsCodeApi();
+//                 const startButton = document.getElementById('startButton');
+//                 const output = document.getElementById('output');
+//                 let recognition;
+
+//                 if ('webkitSpeechRecognition' in window) {
+//                     recognition = new webkitSpeechRecognition();
+//                     recognition.continuous = false;
+//                     recognition.interimResults = false;
+//                     recognition.lang = 'en-US';
+
+//                     recognition.onstart = () => {
+//                         output.textContent = 'Listening... Speak now.';
+//                     };
+
+//                     recognition.onerror = (event) => {
+//                         output.textContent = 'Error: ' + event.error;
+//                     };
+
+//                     recognition.onresult = (event) => {
+//                         const transcript = event.results[0][0].transcript.trim();
+//                         output.textContent = 'Command received: ' + transcript;
+//                         vscode.postMessage({ command: transcript });
+//                     };
+
+//                     recognition.onend = () => {
+//                         output.textContent += ' (Stopped listening)';
+//                     };
+
+//                     startButton.addEventListener('click', () => {
+//                         recognition.start();
+//                     });
+//                 } else {
+//                     output.textContent = 'Voice recognition is not supported in your browser.';
+//                 }
+//             </script>
+//         </body>
+//         </html>
+//     `;
+
+//     panel.webview.onDidReceiveMessage(async (message) => {
+//         const { command } = message;
+
+//         if (command.toLowerCase().includes('generate diagram')) {
+//             const editor = vscode.window.activeTextEditor;
+//             if (!editor) {
+//                 vscode.window.showErrorMessage('No active text editor found.');
+//                 return;
+//             }
+
+//             const selection = editor.selection;
+//             const codeSnippet = editor.document.getText(selection);
+//             const suggestion = await getSuggestions(codeSnippet, 'your-api-key', 'OpenAI GPT-4', 1500, 0.7);
+
+//             if (suggestion) {
+//                 const mermaidCode = extractMermaidCode(suggestion);
+//                 if (mermaidCode) {
+//                     await generateMermaidDiagram(cleanMermaidCode(mermaidCode));
+//                 } else {
+//                     vscode.window.showErrorMessage('No valid Mermaid diagram found.');
+//                 }
+//             }
+//         } else {
+//             vscode.window.showInformationMessage(`Voice command not recognized: "${command}"`);
+//         }
+//     });
+// }
+
+/**
  * This function activates the extension.
  * Registers the command and provides the LLM suggestion to the editor.
  */
 function activate(context) {
-    // Use VSCode Secret Storage for secure API key storage
     const secretStorage = context.secrets;
 
-    // Register the main command for providing LLM-based code suggestions
     let disposable = vscode.commands.registerCommand('codegini.suggestCode', async function () {
         const editor = vscode.window.activeTextEditor;
         if (!editor) {
@@ -127,14 +243,12 @@ function activate(context) {
             return;
         }
 
-        // Prompt user to select LLM provider
-        const provider = await vscode.window.showQuickPick(['Hugging Face', 'Cohere', 'OpenAI GPT-4', 'AWS Llama', 'Azure AI'], { placeHolder: 'Select LLM Provider' });
+        const provider = await vscode.window.showQuickPick(['Hugging Face', 'Cohere', 'OpenAI GPT-4'], { placeHolder: 'Select LLM Provider' });
         if (!provider) {
             vscode.window.showErrorMessage('No provider selected.');
             return;
         }
 
-        // Retrieve user-configured API key or prompt for it
         let apiKey = await secretStorage.get(provider);
         if (!apiKey) {
             apiKey = await vscode.window.showInputBox({ prompt: `Enter your API key for ${provider}` });
@@ -142,48 +256,54 @@ function activate(context) {
                 vscode.window.showErrorMessage('No API key provided.');
                 return;
             }
-            await secretStorage.store(provider, apiKey);  // Store API key securely
+            await secretStorage.store(provider, apiKey);
         }
 
-        // Fetch user configuration settings for maxTokens and temperature
         const config = vscode.workspace.getConfiguration('llmPlugin');
         const maxTokens = config.get('maxTokens') || 3000;
         const temperature = config.get('temperature') || 0.7;
 
-        // Get code suggestion from the selected provider
         const suggestion = await getSuggestions(codeSnippet, apiKey, provider, maxTokens, temperature);
 
-        // Insert the suggestion into the code editor
         if (suggestion) {
-            editor.edit(editBuilder => {
-                editBuilder.replace(selection, suggestion);
-            });
-            vscode.window.showInformationMessage('Code suggestion has been applied to your file.');
+            let mermaidCode = extractMermaidCode(suggestion);
+                console.log('Mermaid Code:', mermaidCode);
+            if (mermaidCode) {
+                mermaidCode = cleanMermaidCode(mermaidCode);
+        
+                if (validateMermaidCode(mermaidCode)) {
+                    await generateMermaidDiagram(mermaidCode);
+                }
+            } else {
+                editor.edit(editBuilder => {
+                    editBuilder.replace(selection, suggestion);
+                });
+                vscode.window.showInformationMessage('Code suggestion has been applied to your file.');
+            }
         } else {
             vscode.window.showErrorMessage('No suggestion found.');
-        }
+        }        
     });
 
-    // Command to delete API key for a specific provider
     let deleteApiKey = vscode.commands.registerCommand('codegini.deleteApiKey', async function () {
-        // Prompt user to select the LLM provider for which to delete the API key
-        const provider = await vscode.window.showQuickPick(['Hugging Face', 'Cohere', 'OpenAI GPT-4', 'AWS Llama', 'Azure AI'], { placeHolder: 'Select LLM Provider to delete API key' });
+        const provider = await vscode.window.showQuickPick(['Hugging Face', 'Cohere', 'OpenAI GPT-4'], { placeHolder: 'Select LLM Provider to delete API key' });
         if (!provider) {
             vscode.window.showErrorMessage('No provider selected.');
             return;
         }
 
-        // Confirm if the user really wants to delete the key
         const confirm = await vscode.window.showQuickPick(['Yes', 'No'], { placeHolder: `Are you sure you want to delete the API key for ${provider}?` });
         if (confirm !== 'Yes') {
             vscode.window.showInformationMessage('API key deletion cancelled.');
             return;
         }
 
-        // Delete the API key from Secret Storage
         await secretStorage.delete(provider);
         vscode.window.showInformationMessage(`API key for ${provider} has been deleted.`);
     });
+    // let voiceCommand = vscode.commands.registerCommand('codegini.voiceCommand', () => {
+    //     handleVoiceCommands(context);
+    // });
 
     context.subscriptions.push(disposable, deleteApiKey);
 }
