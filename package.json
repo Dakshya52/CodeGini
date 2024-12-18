@@ -2,7 +2,7 @@
   "name": "codegini-coding-assistance",
   "displayName": "CodeGini",
   "description": "A plugin that integrates with large language models (LLMs) for coding assistance.",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "publisher": "dakshdhruv",
   "engines": {
     "vscode": "^1.93.0"

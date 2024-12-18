@@ -4,7 +4,7 @@
 
 # LLM Code Suggestion Plugin for VSCode
 
-This VSCode plugin integrates with multiple large language models (LLMs) such as Hugging Face, AWS Llama, and OpenAI GPT-4 to provide advanced code suggestions, refactoring, and completion features directly in your IDE.
+This VSCode plugin integrates with multiple large language models (LLMs) such as Hugging Face, AWS Llama, Cohere, and OpenAI GPT-4 to provide advanced code suggestions, refactoring, and completion features directly in your IDE.
 
 ![Workflow](Assets/CodeGini-Architecture.jpeg)
 

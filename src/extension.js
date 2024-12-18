@@ -20,7 +20,14 @@ async function getSuggestions(codeSnippet, apiKey, provider, maxTokens, temperat
         apiUrl = 'https://api.cohere.ai/v1/generate';
         requestBody = {
             model: 'command-r-08-2024',
-            prompt: `If the user ask to generate diagram just generate the diagram in mermaid format(Ensure the diagram is valid and starts with a supported Mermaid keyword like graph TD) else just perform the task as per the user request. \n\nTask: ${codeSnippet}`,
+            prompt: `When asked to generate any type of diagram, always produce a valid Mermaid diagram in the following format:
+
+Node labels must be wrapped in double quotes, e.g., A["Start"] --> B["Hello"].
+For example, instead of writing A[Start] --> B[hello], write A["Start"] --> B["hello"].
+If the diagram contains expressions or complex labels, ensure they are correctly quoted.
+Verify the Mermaid code is syntactically correct and starts with a supported keyword like graph, sequenceDiagram, or other valid diagram types.
+If not asked for a diagram, simply perform the requested task without generating any Mermaid code.
+Task: ${codeSnippet}`,
             max_tokens: 1500,
             temperature: 0.5,
             k: 5,
@@ -82,6 +89,7 @@ function validateMermaidCode(mermaidCode) {
  * Clean up Mermaid code to avoid syntax errors.
  */
 function cleanMermaidCode(mermaidCode) {
+    console.log(typeof mermaidCode);
     return mermaidCode
         .replace(/^\s*\/\/.*$/gm, '') // Remove single-line comments
         .replace(/\r/g, '')          // Normalize line endings
@@ -89,7 +97,6 @@ function cleanMermaidCode(mermaidCode) {
 }
 
 async function generateMermaidDiagram(mermaidCode) {
-
     const panel = vscode.window.createWebviewPanel(
         'mermaidPreview',
         'Mermaid Diagram Preview',
@@ -101,15 +108,22 @@ async function generateMermaidDiagram(mermaidCode) {
         <!DOCTYPE html>
         <html>
         <head>
-            <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
             <script>
-            try {
-            mermaid.initialize({ startOnLoad: true });
-            } catch (error) {
-        document.body.innerHTML = <pre style="color: red;">Mermaid syntax error: error.message</pre>;
-    }
+                (function() {
+                    const script = document.createElement('script');
+                    script.src = "https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js";
+                    script.onload = () => {
+                        mermaid.initialize({ startOnLoad: true, htmlLabels: true });
+                        try {
+                            mermaid.contentLoaded();
+                        } catch (error) {
+                            document.body.innerHTML = 
+                                "<pre style='color: red;'>Mermaid syntax error: " + error.message + "</pre>";
+                        }
+                    };
+                    document.head.appendChild(script);
+                })();
             </script>
-
         </head>
         <body>
             <div class="mermaid">
@@ -119,6 +133,7 @@ async function generateMermaidDiagram(mermaidCode) {
         </html>
     `;
 }
+
 
 
 
@@ -270,7 +285,7 @@ function activate(context) {
                 console.log('Mermaid Code:', mermaidCode);
             if (mermaidCode) {
                 mermaidCode = cleanMermaidCode(mermaidCode);
-        
+                console.log('Clean Mermaid Code:', mermaidCode);
                 if (validateMermaidCode(mermaidCode)) {
                     await generateMermaidDiagram(mermaidCode);
                 }
