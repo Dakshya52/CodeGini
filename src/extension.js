@@ -20,7 +20,7 @@ async function getSuggestions(codeSnippet, apiKey, provider, maxTokens, temperat
         apiUrl = 'https://api.cohere.ai/v1/generate';
         requestBody = {
             model: 'command-r-08-2024',
-            prompt: `When asked to generate any type of diagram, always produce a valid Mermaid diagram in the following format:
+            prompt: `When asked to generate data flow diagram or expalin the code with the help of data flow diagram, always produce a valid Mermaid diagram in the following format:
 
 Node labels must be wrapped in double quotes, e.g., A["Start"] --> B["Hello"].
 For example, instead of writing A[Start] --> B[hello], write A["Start"] --> B["hello"].
